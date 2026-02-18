@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAP Code Generator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            color: #00d4ff;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #888;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 1000px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-section, .output-section {
+            background: #0f3460;
+            border-radius: 16px;
+            padding: 25px;
+        }
+
+        .section-title {
+            color: #00d4ff;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #1a4a7a;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .form-group input[type="text"],
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #1a4a7a;
+            border-radius: 8px;
+            background: #16213e;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #16213e;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .checkbox-item:hover {
+            background: #1a4a7a;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #00d4ff;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .generate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            border: none;
+            border-radius: 10px;
+            color: #1a1a2e;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .generate-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .output-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .output-tab {
+            padding: 10px 20px;
+            background: #16213e;
+            border: 1px solid #1a4a7a;
+            border-radius: 8px;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .output-tab.active {
+            background: #00d4ff;
+            color: #1a1a2e;
+            border-color: #00d4ff;
+        }
+
+        .output-tab:hover:not(.active) {
+            background: #1a4a7a;
+            color: #fff;
+        }
+
+        .code-output {
+            background: #0a0a1a;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow: auto;
+            position: relative;
+        }
+
+        .code-output pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #e0e0e0;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 8px 15px;
+            background: #1a4a7a;
+            border: none;
+            border-radius: 6px;
+            color: #00d4ff;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .copy-btn:hover {
+            background: #00d4ff;
+            color: #1a1a2e;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #1a4a7a;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #ff4444;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        .fields-input-area {
+            min-height: 120px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #555;
+            font-size: 13px;
+        }
+
+        .footer a {
+            color: #00d4ff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 RAP Code Generator</h1>
+            <p>Generate CDS Views, Behavior Definitions & Handler Classes using AI</p>
+        </header>
+
+        <div class="main-content">
+            <div class="input-section">
+                <h2 class="section-title">📝 Input Configuration</h2>
+                
+                <div class="error-message" id="errorMessage"></div>
+
+                <div class="form-group">
+                    <label>Entity Name (e.g., ZI_SalesOrder)</label>
+                    <input type="text" id="entityName" placeholder="ZI_YourEntityName">
+                </div>
+
+                <div class="form-group">
+                    <label>Database Table Name</label>
+                    <input type="text" id="tableName" placeholder="ZTABLE_NAME">
+                </div>
+
+                <div class="form-group">
+                    <label>Fields (one per line: fieldname - datatype - description)</label>
+                    <textarea id="fieldsInput" class="fields-input-area" placeholder="order_id - NUMC10 - Order ID (Key)
+customer_id - NUMC10 - Customer ID
+order_date - DATS - Order Date
+amount - CURR15.2 - Order Amount
+status - CHAR2 - Order Status"></textarea>
+                    <p class="help-text">Format: fieldname - datatype - description. Mark key fields with (Key)</p>
+                </div>
+
+                <h3 style="color:#00d4ff;margin-bottom:15px;font-size:1em;">Behavior Definition Options</h3>
+                
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optCreate" checked>
+                        <label for="optCreate">Create</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optUpdate" checked>
+                        <label for="optUpdate">Update</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optDelete" checked>
+                        <label for="optDelete">Delete</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optDraft">
+                        <label for="optDraft">Draft Handling</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optActions">
+                        <label for="optActions">Custom Actions</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optValidations">
+                        <label for="optValidations">Validations</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optDeterminations">
+                        <label for="optDeterminations">Determinations</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optFeatureControl">
+                        <label for="optFeatureControl">Feature Control</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optAuthorization">
+                        <label for="optAuthorization">Authorization</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Additional Requirements (describe custom logic, actions, validations)</label>
+                    <textarea id="additionalReq" placeholder="E.g., Add an action 'Approve' that changes status to 'AP'. Add validation to check if amount > 0. Add determination to set created_by field on create."></textarea>
+                </div>
+
+                <button class="generate-btn" onclick="generateCode()">🚀 Generate RAP Code</button>
+            </div>
+
+            <div class="output-section">
+                <h2 class="section-title">📄 Generated Code</h2>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Generating code with Claude AI...</p>
+                </div>
+
+                <div id="outputContainer">
+                    <div class="output-tabs">
+                        <button class="output-tab active" onclick="showTab('cds')">CDS View</button>
+                        <button class="output-tab" onclick="showTab('bd')">Behavior Definition</button>
+                        <button class="output-tab" onclick="showTab('handler')">Handler Class</button>
+                    </div>
+
+                    <div class="code-output">
+                        <button class="copy-btn" onclick="copyCode()">📋 Copy</button>
+                        <pre id="codeOutput">// Generated code will appear here...</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Powered by Claude AI | Built for ABAP Developers
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // CONFIGURATION - UPDATE THIS URL AFTER DEPLOYING CLOUDFLARE WORKER
+        // ============================================
+        const WORKER_URL = 'https://rap-generator.vimal-sharma041.workers.dev';
+        // Example: const WORKER_URL = 'https://rap-generator.your-subdomain.workers.dev';
+        // ============================================
+
+        // State management
+        let generatedCode = {
+            cds: '',
+            bd: '',
+            handler: ''
+        };
+        let currentTab = 'cds';
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.classList.add('active');
+            setTimeout(() => errorEl.classList.remove('active'), 5000);
+        }
+
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.output-tab:nth-child(${tab === 'cds' ? 1 : tab === 'bd' ? 2 : 3})`).classList.add('active');
+            document.getElementById('codeOutput').textContent = generatedCode[tab] || '// No code generated yet...';
+        }
+
+        function copyCode() {
+            const code = generatedCode[currentTab];
+            if (code) {
+                navigator.clipboard.writeText(code);
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => btn.textContent = '📋 Copy', 2000);
+            }
+        }
+
+        async function generateCode() {
+            if (WORKER_URL === 'YOUR_CLOUDFLARE_WORKER_URL_HERE') {
+                showError('Worker URL not configured. Please deploy Cloudflare Worker first.');
+                return;
+            }
+
+            const entityName = document.getElementById('entityName').value.trim();
+            const tableName = document.getElementById('tableName').value.trim();
+            const fieldsInput = document.getElementById('fieldsInput').value.trim();
+
+            if (!entityName || !tableName || !fieldsInput) {
+                showError('Please fill in Entity Name, Table Name, and Fields');
+                return;
+            }
+
+            // Gather options
+            const options = {
+                create: document.getElementById('optCreate').checked,
+                update: document.getElementById('optUpdate').checked,
+                delete: document.getElementById('optDelete').checked,
+                draft: document.getElementById('optDraft').checked,
+                actions: document.getElementById('optActions').checked,
+                validations: document.getElementById('optValidations').checked,
+                determinations: document.getElementById('optDeterminations').checked,
+                featureControl: document.getElementById('optFeatureControl').checked,
+                authorization: document.getElementById('optAuthorization').checked
+            };
+
+            const additionalReq = document.getElementById('additionalReq').value.trim();
+
+            // Build prompt
+            const prompt = buildPrompt(entityName, tableName, fieldsInput, options, additionalReq);
+
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('outputContainer').style.display = 'none';
+
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 8000,
+                        messages: [{
+                            role: 'user',
+                            content: prompt
+                        }]
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error?.message || 'API request failed');
+                }
+
+                const data = await response.json();
+
+                // Parse response
+                parseResponse(data.content[0].text);
+
+                // Show output
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('outputContainer').style.display = 'block';
+                showTab('cds');
+
+            } catch (error) {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('outputContainer').style.display = 'block';
+                showError('Error: ' + error.message);
+            }
+        }
+
+        function buildPrompt(entityName, tableName, fieldsInput, options, additionalReq) {
+            let optionsList = [];
+            if (options.create) optionsList.push('create');
+            if (options.update) optionsList.push('update');
+            if (options.delete) optionsList.push('delete');
+            if (options.draft) optionsList.push('draft handling with draft table');
+            if (options.actions) optionsList.push('custom actions (generate sample actions based on the entity context)');
+            if (options.validations) optionsList.push('validations (generate meaningful validations based on fields)');
+            if (options.determinations) optionsList.push('determinations (generate useful determinations like setting timestamps, user info)');
+            if (options.featureControl) optionsList.push('instance feature control');
+            if (options.authorization) optionsList.push('authorization master');
+
+            return `You are an expert SAP ABAP developer specializing in RAP (RESTful ABAP Programming) development.
+
+Generate complete, production-ready code for the following RAP Business Object:
+
+**Entity Name:** ${entityName}
+**Database Table:** ${tableName}
+**Fields:**
+${fieldsInput}
+
+**Required Features:**
+${optionsList.join(', ')}
+
+**Additional Requirements:**
+${additionalReq || 'None specified'}
+
+Please generate the following three separate code blocks:
+
+1. **CDS View** - Complete CDS view definition with:
+   - Proper annotations (@AbapCatalog, @AccessControl, @EndUserText, @ObjectModel)
+   - All fields with proper associations if applicable
+   - UI annotations for Fiori Elements
+
+2. **Behavior Definition** - Complete BDEF with:
+   - All requested operations and features
+   - Proper syntax for managed/unmanaged scenario
+   - Field mappings
+   - All actions, validations, determinations as requested
+
+3. **Handler Class** - Complete ABAP class implementing:
+   - All methods for the behavior definition
+   - Proper method signatures
+   - Sample implementation logic for each method
+   - Comments explaining the logic
+
+Format your response EXACTLY as follows (use these exact markers):
+
+===CDS_START===
+(CDS view code here)
+===CDS_END===
+
+===BD_START===
+(Behavior definition code here)
+===BD_END===
+
+===HANDLER_START===
+(Handler class code here)
+===HANDLER_END===
+
+Important:
+- Generate syntactically correct ABAP/CDS code
+- Use current RAP best practices
+- Include helpful comments
+- Make the code production-ready`;
+        }
+
+        function parseResponse(responseText) {
+            // Extract CDS
+            const cdsMatch = responseText.match(/===CDS_START===([\s\S]*?)===CDS_END===/);
+            generatedCode.cds = cdsMatch ? cdsMatch[1].trim() : '// CDS view not generated';
+
+            // Extract BD
+            const bdMatch = responseText.match(/===BD_START===([\s\S]*?)===BD_END===/);
+            generatedCode.bd = bdMatch ? bdMatch[1].trim() : '// Behavior definition not generated';
+
+            // Extract Handler
+            const handlerMatch = responseText.match(/===HANDLER_START===([\s\S]*?)===HANDLER_END===/);
+            generatedCode.handler = handlerMatch ? handlerMatch[1].trim() : '// Handler class not generated';
+        }
+    </script>
+</body>
+</html>
