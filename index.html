@@ -521,9 +521,9 @@ status - CHAR2 - Order Status"></textarea>
             if (options.featureControl) optionsList.push('instance feature control');
             if (options.authorization) optionsList.push('authorization master');
 
-            return `You are an expert SAP ABAP developer specializing in RAP (RESTful ABAP Programming) development.
-
-Generate complete, production-ready code for the following RAP Business Object:
+            return `You are an expert SAP ABAP developer specializing in RAP (RESTful ABAP Programming) development for CBC kind of apps.
+                    Also make sure to use standard CDS views for doing validations(if selected by user) and same for F4 helps and wherever needed.
+                    Generate complete, production-ready code for the following RAP Business Object:
 
 **Entity Name:** ${entityName}
 **Database Table:** ${tableName}
