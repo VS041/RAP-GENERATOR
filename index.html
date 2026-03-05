@@ -479,11 +479,12 @@ status - CHAR2 - Order Status"></textarea>
                     },
                     body: JSON.stringify({
                         model: 'claude-sonnet-4-5-20250929',
-                        max_tokens: 8000,
+                        max_tokens: 20000,
                         messages: [{
                             role: 'user',
                             content: prompt
-                        }]
+                        }],
+                        stream:true
                     })
                 });
 
