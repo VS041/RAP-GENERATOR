@@ -27,6 +27,7 @@
         header {
             text-align: center;
             margin-bottom: 30px;
+            position: relative;
         }
 
         header h1 {
@@ -282,6 +283,165 @@
             color: #00d4ff;
             text-decoration: none;
         }
+        /* How to Use Button */
+        .how-to-use-btn {
+            position: absolute;
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+            padding: 11px 24px;
+            background: transparent;
+            border: 1.5px solid rgba(0,212,255,0.5);
+            border-radius: 50px;
+            color: #00d4ff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.35s ease;
+            z-index: 10;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(6px);
+            overflow: hidden;
+        }
+        .how-to-use-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(0,212,255,0.08), rgba(0,153,204,0.05));
+            z-index: -1;
+            transition: all 0.35s ease;
+        }
+        .how-to-use-btn:hover {
+            transform: translateY(-50%) scale(1.04);
+            border-color: #00d4ff;
+            box-shadow: 0 0 20px rgba(0,212,255,0.25), inset 0 0 20px rgba(0,212,255,0.06);
+            color: #fff;
+        }
+        .how-to-use-btn:hover::before {
+            background: linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,153,204,0.12));
+        }
+        .how-to-use-btn .btn-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #1a1a2e;
+            font-weight: 800;
+            flex-shrink: 0;
+            box-shadow: 0 0 8px rgba(0,212,255,0.4);
+            animation: btnPulse 2.5s ease-in-out infinite;
+        }
+        @keyframes btnPulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(0,212,255,0.4); }
+            50% { box-shadow: 0 0 16px rgba(0,212,255,0.7); }
+        }
+
+        /* Tour Overlay */
+        .tour-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 9998;
+            transition: opacity 0.3s;
+        }
+        .tour-backdrop.active { display: block; }
+
+        .tour-highlight {
+            position: relative;
+            z-index: 9999 !important;
+            box-shadow: 0 0 0 4px #00d4ff, 0 0 20px rgba(0,212,255,0.5) !important;
+            border-radius: 8px;
+            transition: box-shadow 0.3s;
+        }
+
+        .tour-tooltip {
+            display: none;
+            position: absolute;
+            z-index: 10000;
+            background: #0f3460;
+            border: 2px solid #00d4ff;
+            border-radius: 12px;
+            padding: 20px;
+            width: 320px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            animation: tourFadeIn 0.3s ease;
+        }
+        .tour-tooltip.active { display: block; }
+
+        @keyframes tourFadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tour-tooltip h4 {
+            color: #00d4ff;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        .tour-tooltip p {
+            color: #ccc;
+            font-size: 13px;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .tour-progress {
+            background: #16213e;
+            border-radius: 10px;
+            height: 6px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .tour-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #0099cc);
+            border-radius: 10px;
+            transition: width 0.4s ease;
+        }
+        .tour-step-label {
+            color: #888;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .tour-buttons {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .tour-btn-skip {
+            background: none;
+            border: 1px solid #555;
+            color: #888;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .tour-btn-skip:hover { border-color: #ff4444; color: #ff4444; }
+
+        .tour-btn-next {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            border: none;
+            color: #1a1a2e;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: transform 0.2s;
+        }
+        .tour-btn-next:hover { transform: scale(1.05); }
+
     </style>
 </head>
 <body>
@@ -289,6 +449,7 @@
         <header>
             <h1>🚀 RAP Code Generator</h1>
             <p>Generate CDS Views, Behavior Definitions & Handler Classes using AI</p>
+            <button class="how-to-use-btn" onclick="startTour()"><span class="btn-icon">?</span> Take a Tour</button>
         </header>
 
         <div class="main-content">
@@ -589,6 +750,321 @@ Important:
             // Extract Handler
             const handlerMatch = responseText.match(/===HANDLER_START===([\s\S]*?)===HANDLER_END===/);
             generatedCode.handler = handlerMatch ? handlerMatch[1].trim() : '// Handler class not generated';
+        }
+        // ==================== GUIDED TOUR ====================
+        let tourActive = false;
+        let tourStep = 0;
+        let tourTooltip = null;
+        let tourBackdrop = null;
+        let prevHighlighted = null;
+
+        const tourSteps = [
+            {
+                target: '#entityName',
+                title: 'Step 1: Entity Name',
+                desc: 'Start by naming your CDS entity. Follow the Z-naming convention for custom objects.',
+                value: 'ZENTITY_NAME',
+                type: 'type'
+            },
+            {
+                target: '#tableName',
+                title: 'Step 2: Database Table',
+                desc: 'Enter the SAP database table your RAP Business Object will be built on.',
+                value: 'ZTABLE_NAME',
+                type: 'type'
+            },
+            {
+                target: '#fieldsInput',
+                title: 'Step 3: Define Fields',
+                desc: 'List your table fields — one per line. Key fields go on top and are marked with (KEY).',
+                value: 'BUKRS (KEY)\nWERKS\nKOKRS\nKUNNR',
+                type: 'type'
+            },
+            {
+                target: '.checkbox-group',
+                title: 'Step 4: Authorization & Validations',
+                desc: 'Enable Authorization and Validations together. These are essential for any production-ready RAP app.',
+                type: 'multicheck',
+                checks: ['#optAuthorization', '#optValidations']
+            },
+            {
+                target: '#additionalReq',
+                title: 'Step 5: Additional Requirements',
+                desc: 'Describe custom logic here. The AI reads this and generates matching code in the handler class.',
+                value: 'Add authorization check on KOSTL (Cost Center) field — validate user has proper access before allowing create/update.',
+                type: 'type'
+            },
+            {
+                target: '.generate-btn',
+                title: 'Step 6: Generate Code!',
+                desc: 'Click Generate and the AI creates your complete RAP code. Let\'s simulate it now so you can see the output!',
+                type: 'generate'
+            },
+            {
+                target: '.output-section',
+                title: '✅ Your Code is Ready!',
+                desc: 'Your generated code appears here across 3 tabs — CDS View, Behavior Definition, and Handler Class. Copy any tab with one click!',
+                type: 'showcase'
+            }
+        ];
+
+        function createTourElements() {
+            if (!document.querySelector('.tour-backdrop')) {
+                tourBackdrop = document.createElement('div');
+                tourBackdrop.className = 'tour-backdrop';
+                tourBackdrop.addEventListener('click', endTour);
+                document.body.appendChild(tourBackdrop);
+            } else {
+                tourBackdrop = document.querySelector('.tour-backdrop');
+            }
+
+            if (!document.querySelector('.tour-tooltip')) {
+                tourTooltip = document.createElement('div');
+                tourTooltip.className = 'tour-tooltip';
+                document.body.appendChild(tourTooltip);
+            } else {
+                tourTooltip = document.querySelector('.tour-tooltip');
+            }
+        }
+
+        function startTour() {
+            tourStep = 0;
+            tourActive = true;
+            // Clear all fields first
+            clearAllFields();
+            createTourElements();
+            tourBackdrop.classList.add('active');
+            showTourStep();
+        }
+
+        function endTour() {
+            tourActive = false;
+            if (prevHighlighted) prevHighlighted.classList.remove('tour-highlight');
+            if (tourBackdrop) tourBackdrop.classList.remove('active');
+            if (tourTooltip) tourTooltip.classList.remove('active');
+            clearAllFields();
+        }
+
+        function clearAllFields() {
+            document.getElementById('entityName').value = '';
+            document.getElementById('tableName').value = '';
+            document.getElementById('fieldsInput').value = '';
+            document.getElementById('additionalReq').value = '';
+            // Uncheck non-default checkboxes
+            document.getElementById('optActions').checked = false;
+            document.getElementById('optValidations').checked = false;
+            document.getElementById('optDeterminations').checked = false;
+            document.getElementById('optFeatureControl').checked = false;
+            document.getElementById('optAuthorization').checked = false;
+            document.getElementById('optDraft').checked = false;
+            // Reset defaults
+            document.getElementById('optCreate').checked = true;
+            document.getElementById('optUpdate').checked = true;
+            document.getElementById('optDelete').checked = true;
+            // Reset output
+            generatedCode = { cds: '', bd: '', handler: '' };
+            document.getElementById('codeOutput').textContent = '// Generated code will appear here...';
+        }
+
+        async function typeValue(el, text) {
+            el.value = '';
+            el.focus();
+            for (let i = 0; i < text.length; i++) {
+                el.value += text[i];
+                // Trigger input event for textareas to auto-resize if needed
+                el.dispatchEvent(new Event('input'));
+                await new Promise(r => setTimeout(r, 30 + Math.random() * 30));
+            }
+        }
+
+        // Sample code for tour demo
+        const sampleCDS = `@AbapCatalog.sqlViewName: 'ZENTITY_NAME'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Entity Name CDS View'
+
+@UI.headerInfo: {
+  typeName: 'Entity',
+  typeNamePlural: 'Entities',
+  title: { type: #STANDARD, value: 'Bukrs' }
+}
+
+define root view entity ZENTITY_NAME
+  as select from ztable_name
+{
+      @UI.facet: [{ id: 'General',
+                    purpose: #STANDARD,
+                    type: #IDENTIFICATION_REFERENCE,
+                    label: 'General Info',
+                    position: 10 }]
+
+      @UI: { lineItem: [{ position: 10 }],
+             identification: [{ position: 10 }] }
+  key bukrs    as Bukrs,
+
+      @UI: { lineItem: [{ position: 20 }],
+             identification: [{ position: 20 }] }
+      werks    as Werks,
+
+      @UI: { lineItem: [{ position: 30 }],
+             identification: [{ position: 30 }] }
+      kokrs    as Kokrs,
+
+      @UI: { lineItem: [{ position: 40 }],
+             identification: [{ position: 40 }] }
+      kunnr    as Kunnr
+}`;
+
+        const sampleBD = `managed implementation in class zbp_entity_name unique;
+strict ( 2 );
+
+define behavior for ZENTITY_NAME alias EntityName
+persistent table ztable_name
+lock master
+authorization master
+{
+  create;
+  update;
+  delete;
+
+  field ( readonly ) Bukrs;
+
+  validation validateKostl on save
+    { create; update; field Kokrs; }
+
+  mapping for ztable_name corresponding
+  {
+    Bukrs  = bukrs;
+    Werks  = werks;
+    Kokrs  = kokrs;
+    Kunnr  = kunnr;
+  }
+}`;
+
+        const sampleHandler = `CLASS zbp_entity_name DEFINITION PUBLIC FINAL
+  CREATE PUBLIC.
+  PUBLIC SECTION.
+    INTERFACES if_abap_behv_handler.
+ENDCLASS.
+
+CLASS zbp_entity_name IMPLEMENTATION.
+  METHOD if_abap_behv_handler~validate.
+    " --- Authorization check on KOSTL ---
+    AUTHORITY-CHECK OBJECT 'K_KOSTL'
+      ID 'KOSTL' FIELD ls_entity-kostl
+      ID 'ACTVT' FIELD '02'.
+    IF sy-subrc <> 0.
+      APPEND VALUE #( %tky = ls_entity-%tky )
+        TO failed-entityname.
+      APPEND VALUE #( %tky = ls_entity-%tky
+        %msg = new_message_with_text(
+          severity = if_abap_behv_message=>severity-error
+          text = 'No authorization for Cost Center' ) )
+        TO reported-entityname.
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.`;
+
+        async function showTourStep() {
+            if (!tourActive || tourStep >= tourSteps.length) {
+                endTour();
+                return;
+            }
+
+            const step = tourSteps[tourStep];
+            const target = document.querySelector(step.target);
+            if (!target) { tourStep++; showTourStep(); return; }
+
+            // Remove previous highlight
+            if (prevHighlighted) prevHighlighted.classList.remove('tour-highlight');
+
+            // Determine highlight element
+            let highlightEl = target;
+            if (step.type === 'check') {
+                highlightEl = target.closest('.checkbox-item') || target;
+            } else if (step.type === 'multicheck') {
+                highlightEl = target;
+            }
+            highlightEl.classList.add('tour-highlight');
+            prevHighlighted = highlightEl;
+
+            // Scroll into view
+            highlightEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            await new Promise(r => setTimeout(r, 400));
+
+            // Perform the action based on type
+            if (step.type === 'type' && step.value) {
+                await typeValue(target, step.value);
+            } else if (step.type === 'check') {
+                await new Promise(r => setTimeout(r, 300));
+                target.checked = true;
+            } else if (step.type === 'multicheck' && step.checks) {
+                for (const sel of step.checks) {
+                    const cb = document.querySelector(sel);
+                    if (cb) {
+                        await new Promise(r => setTimeout(r, 400));
+                        cb.checked = true;
+                        // Flash the parent item
+                        const item = cb.closest('.checkbox-item');
+                        if (item) {
+                            item.style.background = '#1a4a7a';
+                            setTimeout(() => item.style.background = '', 600);
+                        }
+                    }
+                }
+            } else if (step.type === 'generate') {
+                // Simulate code generation
+                await new Promise(r => setTimeout(r, 300));
+                generatedCode.cds = sampleCDS;
+                generatedCode.bd = sampleBD;
+                generatedCode.handler = sampleHandler;
+                document.getElementById('outputContainer').style.display = 'block';
+                showTab('cds');
+            } else if (step.type === 'showcase') {
+                // Just highlight the output - code is already there
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            // Position tooltip
+            const pct = ((tourStep + 1) / tourSteps.length) * 100;
+            const isLast = tourStep === tourSteps.length - 1;
+
+            tourTooltip.innerHTML = `
+                <div class="tour-step-label">Step ${tourStep + 1} of ${tourSteps.length}</div>
+                <div class="tour-progress"><div class="tour-progress-bar" style="width:${pct}%"></div></div>
+                <h4>${step.title}</h4>
+                <p>${step.desc}</p>
+                <div class="tour-buttons">
+                    <button class="tour-btn-skip" onclick="endTour()">Skip Tour</button>
+                    <button class="tour-btn-next" onclick="nextTourStep()">${isLast ? '✅ Finish' : 'Next →'}</button>
+                </div>
+            `;
+
+            // Position below or above the target
+            const rect = highlightEl.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+
+            tourTooltip.classList.add('active');
+
+            if (spaceBelow > 200) {
+                tourTooltip.style.top = (rect.bottom + window.scrollY + 15) + 'px';
+            } else {
+                tourTooltip.style.top = (rect.top + window.scrollY - tourTooltip.offsetHeight - 15) + 'px';
+            }
+
+            // Center horizontally relative to target, but keep within viewport
+            let left = rect.left + (rect.width / 2) - 160;
+            left = Math.max(10, Math.min(left, window.innerWidth - 340));
+            tourTooltip.style.left = left + 'px';
+        }
+
+        function nextTourStep() {
+            tourStep++;
+            if (tourStep >= tourSteps.length) {
+                endTour();
+            } else {
+                showTourStep();
+            }
         }
     </script>
 </body>
