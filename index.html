@@ -187,6 +187,43 @@
             color: #fff;
         }
 
+        .output-tab .tab-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .output-tab.active .tab-spinner {
+            border-top-color: #1a1a2e;
+            border-color: rgba(0,0,0,0.2);
+        }
+
+        .output-tab.tab-ready {
+            border-color: #00cc66;
+        }
+
+        .output-tab.tab-ready:not(.active) {
+            color: #00cc66;
+        }
+
+        .token-exhausted-msg {
+            display: block;
+            margin-top: 15px;
+            padding: 10px 14px;
+            background: rgba(255, 170, 0, 0.15);
+            border: 1px solid #ffaa00;
+            border-radius: 8px;
+            color: #ffaa00;
+            font-size: 13px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
         .code-output {
             background: #0a0a1a;
             border-radius: 10px;
@@ -570,6 +607,7 @@ status - CHAR2 - Order Status"></textarea>
             handler: ''
         };
         let currentTab = 'cds';
+        let tabStatus = { cds: 'idle', bd: 'idle', handler: 'idle' }; // idle | processing | ready | exhausted
 
         function showError(message) {
             const errorEl = document.getElementById('errorMessage');
@@ -578,11 +616,45 @@ status - CHAR2 - Order Status"></textarea>
             setTimeout(() => errorEl.classList.remove('active'), 5000);
         }
 
+        function updateTabButtons() {
+            const tabs = document.querySelectorAll('.output-tab');
+            const tabKeys = ['cds', 'bd', 'handler'];
+            tabs.forEach((tab, i) => {
+                const key = tabKeys[i];
+                const status = tabStatus[key];
+                const label = key === 'cds' ? 'CDS View' : key === 'bd' ? 'Behavior Definition' : 'Handler Class';
+                tab.classList.remove('tab-ready');
+                if (status === 'processing') {
+                    tab.innerHTML = label + ' <span class="tab-spinner"></span>';
+                } else if (status === 'ready' || status === 'exhausted') {
+                    tab.innerHTML = (status === 'ready' ? '✅ ' : '⚠️ ') + label;
+                    if (status === 'ready') tab.classList.add('tab-ready');
+                } else {
+                    tab.innerHTML = label;
+                }
+            });
+        }
+
         function showTab(tab) {
             currentTab = tab;
             document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
             document.querySelector(`.output-tab:nth-child(${tab === 'cds' ? 1 : tab === 'bd' ? 2 : 3})`).classList.add('active');
-            document.getElementById('codeOutput').textContent = generatedCode[tab] || '// No code generated yet...';
+            updateTabButtons();
+
+            const status = tabStatus[tab];
+            const codeEl = document.getElementById('codeOutput');
+            if (status === 'processing' && !generatedCode[tab]) {
+                codeEl.textContent = '⏳ Generating... please wait';
+            } else if (status === 'exhausted') {
+                codeEl.innerHTML = escapeHtml(generatedCode[tab] || '') +
+                    '<span class="token-exhausted-msg">⚠️ All tokens consumed for this request. This section could not be fully generated.</span>';
+            } else {
+                codeEl.textContent = generatedCode[tab] || '// No code generated yet...';
+            }
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         }
 
         function copyCode() {
@@ -628,9 +700,14 @@ status - CHAR2 - Order Status"></textarea>
             // Build prompt
             const prompt = buildPrompt(entityName, tableName, fieldsInput, options, additionalReq);
 
-            // Show loading
-            document.getElementById('loading').classList.add('active');
-            document.getElementById('outputContainer').style.display = 'none';
+            // Reset state
+            generatedCode = { cds: '', bd: '', handler: '' };
+            tabStatus = { cds: 'processing', bd: 'processing', handler: 'processing' };
+
+            // Show output area immediately with processing state
+            document.getElementById('loading').classList.remove('active');
+            document.getElementById('outputContainer').style.display = 'block';
+            showTab('cds');
 
             try {
                 const response = await fetch(WORKER_URL, {
@@ -645,30 +722,149 @@ status - CHAR2 - Order Status"></textarea>
                             role: 'user',
                             content: prompt
                         }],
-                        stream:true
+                        stream: true
                     })
                 });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error?.message || 'API request failed');
+                    const error = await response.text();
+                    throw new Error(error || 'API request failed');
                 }
 
-                const data = await response.json();
+                // Read the SSE stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = '';
+                let sseBuffer = '';
 
-                // Parse response
-                parseResponse(data.content[0].text);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                // Show output
-                document.getElementById('loading').classList.remove('active');
-                document.getElementById('outputContainer').style.display = 'block';
-                showTab('cds');
+                    sseBuffer += decoder.decode(value, { stream: true });
+
+                    // Parse SSE events from buffer
+                    const lines = sseBuffer.split('\n');
+                    sseBuffer = lines.pop(); // keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.slice(6).trim();
+                            if (!jsonStr) continue;
+                            try {
+                                const event = JSON.parse(jsonStr);
+                                if (event.type === 'content_block_delta' && event.delta?.text) {
+                                    fullText += event.delta.text;
+                                    processStreamedText(fullText);
+                                }
+                            } catch (e) {
+                                // skip unparseable lines
+                            }
+                        }
+                    }
+                }
+
+                // Stream ended - finalize any sections that didn't get END markers
+                finalizeStream(fullText);
 
             } catch (error) {
-                document.getElementById('loading').classList.remove('active');
-                document.getElementById('outputContainer').style.display = 'block';
+                // If error happens mid-stream, finalize what we have
+                tabStatus.cds = tabStatus.cds === 'processing' ? 'idle' : tabStatus.cds;
+                tabStatus.bd = tabStatus.bd === 'processing' ? 'idle' : tabStatus.bd;
+                tabStatus.handler = tabStatus.handler === 'processing' ? 'idle' : tabStatus.handler;
+                updateTabButtons();
                 showError('Error: ' + error.message);
             }
+        }
+
+        function processStreamedText(fullText) {
+            // Check each section progressively
+            const cdsStart = fullText.indexOf('===CDS_START===');
+            const cdsEnd = fullText.indexOf('===CDS_END===');
+            const bdStart = fullText.indexOf('===BD_START===');
+            const bdEnd = fullText.indexOf('===BD_END===');
+            const handlerStart = fullText.indexOf('===HANDLER_START===');
+            const handlerEnd = fullText.indexOf('===HANDLER_END===');
+
+            // CDS section
+            if (cdsStart !== -1 && cdsEnd !== -1 && tabStatus.cds !== 'ready') {
+                generatedCode.cds = fullText.substring(cdsStart + 15, cdsEnd).trim();
+                tabStatus.cds = 'ready';
+                if (currentTab === 'cds') showTab('cds');
+                updateTabButtons();
+            } else if (cdsStart !== -1 && cdsEnd === -1) {
+                // CDS is being streamed right now - show live
+                generatedCode.cds = fullText.substring(cdsStart + 15).trim();
+                if (currentTab === 'cds') {
+                    document.getElementById('codeOutput').textContent = generatedCode.cds;
+                }
+            }
+
+            // BD section
+            if (bdStart !== -1 && bdEnd !== -1 && tabStatus.bd !== 'ready') {
+                generatedCode.bd = fullText.substring(bdStart + 14, bdEnd).trim();
+                tabStatus.bd = 'ready';
+                if (currentTab === 'bd') showTab('bd');
+                updateTabButtons();
+            } else if (bdStart !== -1 && bdEnd === -1) {
+                generatedCode.bd = fullText.substring(bdStart + 14).trim();
+                if (currentTab === 'bd') {
+                    document.getElementById('codeOutput').textContent = generatedCode.bd;
+                }
+            }
+
+            // Handler section
+            if (handlerStart !== -1 && handlerEnd !== -1 && tabStatus.handler !== 'ready') {
+                generatedCode.handler = fullText.substring(handlerStart + 19, handlerEnd).trim();
+                tabStatus.handler = 'ready';
+                if (currentTab === 'handler') showTab('handler');
+                updateTabButtons();
+            } else if (handlerStart !== -1 && handlerEnd === -1) {
+                generatedCode.handler = fullText.substring(handlerStart + 19).trim();
+                if (currentTab === 'handler') {
+                    document.getElementById('codeOutput').textContent = generatedCode.handler;
+                }
+            }
+        }
+
+        function finalizeStream(fullText) {
+            // For any section still "processing", check if partial content exists
+            if (tabStatus.cds === 'processing') {
+                const cdsStart = fullText.indexOf('===CDS_START===');
+                if (cdsStart !== -1) {
+                    generatedCode.cds = fullText.substring(cdsStart + 15).trim();
+                    tabStatus.cds = 'exhausted';
+                } else {
+                    generatedCode.cds = '';
+                    tabStatus.cds = 'exhausted';
+                }
+            }
+            if (tabStatus.bd === 'processing') {
+                const bdStart = fullText.indexOf('===BD_START===');
+                if (bdStart !== -1) {
+                    // Remove any trailing markers from other sections
+                    let content = fullText.substring(bdStart + 14);
+                    const nextMarker = content.indexOf('===HANDLER_START===');
+                    if (nextMarker !== -1) content = content.substring(0, nextMarker);
+                    generatedCode.bd = content.trim();
+                    tabStatus.bd = 'exhausted';
+                } else {
+                    generatedCode.bd = '';
+                    tabStatus.bd = 'exhausted';
+                }
+            }
+            if (tabStatus.handler === 'processing') {
+                const handlerStart = fullText.indexOf('===HANDLER_START===');
+                if (handlerStart !== -1) {
+                    generatedCode.handler = fullText.substring(handlerStart + 19).trim();
+                    tabStatus.handler = 'exhausted';
+                } else {
+                    generatedCode.handler = '';
+                    tabStatus.handler = 'exhausted';
+                }
+            }
+            updateTabButtons();
+            showTab(currentTab);
         }
 
         function buildPrompt(entityName, tableName, fieldsInput, options, additionalReq) {
@@ -863,6 +1059,8 @@ Important:
             document.getElementById('optDelete').checked = true;
             // Reset output
             generatedCode = { cds: '', bd: '', handler: '' };
+            tabStatus = { cds: 'idle', bd: 'idle', handler: 'idle' };
+            updateTabButtons();
             document.getElementById('codeOutput').textContent = '// Generated code will appear here...';
         }
 
@@ -1018,6 +1216,7 @@ ENDCLASS.`;
                 generatedCode.cds = sampleCDS;
                 generatedCode.bd = sampleBD;
                 generatedCode.handler = sampleHandler;
+                tabStatus = { cds: 'ready', bd: 'ready', handler: 'ready' };
                 document.getElementById('outputContainer').style.display = 'block';
                 showTab('cds');
             } else if (step.type === 'showcase') {
