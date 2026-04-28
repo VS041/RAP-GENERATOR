@@ -123,6 +123,12 @@
             background: #1a4a7a;
         }
 
+        .checkbox-item.disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
         .checkbox-item input[type="checkbox"] {
             width: 18px;
             height: 18px;
@@ -515,50 +521,35 @@ status - CHAR2"></textarea>
                     <p class="help-text">Format: fieldname - datatype. Mark key fields with (Key).If custom fields, specify data type othwerwise don't need it</p>
                 </div>
 
-                <h3 style="color:#00d4ff;margin-bottom:15px;font-size:1em;">Behavior Definition Options</h3>
+                <h3 style="color:#00d4ff;margin-bottom:15px;font-size:1em;">Features</h3>
                 
                 <div class="checkbox-group">
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="optCreate" checked>
-                        <label for="optCreate">Create</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="optUpdate" checked>
-                        <label for="optUpdate">Update</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="optDelete" checked>
-                        <label for="optDelete">Delete</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="optDraft">
-                        <label for="optDraft">Draft Handling</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="optActions">
-                        <label for="optActions">Custom Actions</label>
-                    </div>
                     <div class="checkbox-item">
                         <input type="checkbox" id="optValidations">
                         <label for="optValidations">Validations</label>
                     </div>
                     <div class="checkbox-item">
-                        <input type="checkbox" id="optDeterminations">
-                        <label for="optDeterminations">Determinations</label>
+                        <input type="checkbox" id="optF4Help">
+                        <label for="optF4Help">F4 Help</label>
+                    </div>
+                </div>
+
+                <h3 style="color:#00d4ff;margin-bottom:15px;font-size:1em;">Scenarios</h3>
+                
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="optExcelUpload">
+                        <label for="optExcelUpload">Excel Upload & Post with BAPI</label>
                     </div>
                     <div class="checkbox-item">
-                        <input type="checkbox" id="optFeatureControl">
-                        <label for="optFeatureControl">Feature Control</label>
-                    </div>
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="optAuthorization">
-                        <label for="optAuthorization">Authorization</label>
+                        <input type="checkbox" id="optRapBO">
+                        <label for="optRapBO">RAP BO with BAPI</label>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Additional Requirements (describe custom logic, actions, validations)</label>
-                    <textarea id="additionalReq" placeholder="E.g., Add an action 'Approve' that changes status to 'AP'. Add validation to check if amount > 0. Add determination to set created_by field on create."></textarea>
+                    <textarea id="additionalReq" placeholder="E.g., Posting BAPI: BAPI_FIXEDASSET_CHANGE, Check BAPI: BAPI_FIXEDASSET_CHECK. Add validation to check if amount > 0."></textarea>
                 </div>
 
                 <button class="generate-btn" onclick="generateCode()">🚀 Generate RAP Code</button>
@@ -574,9 +565,11 @@ status - CHAR2"></textarea>
 
                 <div id="outputContainer">
                     <div class="output-tabs">
-                        <button class="output-tab active" onclick="showTab('cds')">CDS View</button>
-                        <button class="output-tab" onclick="showTab('bd')">Behavior Definition</button>
-                        <button class="output-tab" onclick="showTab('handler')">Handler Class</button>
+                        <button class="output-tab active" id="tab-cds" onclick="showTab('cds')">CDS View</button>
+                        <button class="output-tab" id="tab-bd" onclick="showTab('bd')">Behavior Definition</button>
+                        <button class="output-tab" id="tab-handler" onclick="showTab('handler')">Handler Class</button>
+                        <button class="output-tab" id="tab-upload" onclick="showTab('upload')" style="display:none">Upload Handler</button>
+                        <button class="output-tab" id="tab-saver" onclick="showTab('saver')" style="display:none">Saver Class</button>
                     </div>
 
                     <div class="code-output">
@@ -597,17 +590,69 @@ status - CHAR2"></textarea>
         // CONFIGURATION - UPDATE THIS URL AFTER DEPLOYING CLOUDFLARE WORKER
         // ============================================
         const WORKER_URL = 'https://rap-generator.vimal-sharma041.workers.dev';
-        // Example: const WORKER_URL = 'https://rap-generator.your-subdomain.workers.dev';
         // ============================================
 
         // State management
         let generatedCode = {
             cds: '',
             bd: '',
-            handler: ''
+            handler: '',
+            upload: '',
+            saver: ''
         };
         let currentTab = 'cds';
-        let tabStatus = { cds: 'idle', bd: 'idle', handler: 'idle' }; // idle | processing | ready | exhausted
+        let tabStatus = { cds: 'idle', bd: 'idle', handler: 'idle', upload: 'idle', saver: 'idle' };
+
+        // ===== CHECKBOX MUTUAL EXCLUSION =====
+        // Group A (combine): Validations + F4 Help
+        // Group B (standalone): Excel Upload & Post with BAPI
+        // Group C (standalone): RAP BO with BAPI
+        function updateCheckboxStates() {
+            var val = document.getElementById('optValidations');
+            var f4 = document.getElementById('optF4Help');
+            var excel = document.getElementById('optExcelUpload');
+            var rapbo = document.getElementById('optRapBO');
+
+            if (excel.checked) {
+                // Group B selected — disable all others
+                setCheckboxDisabled(val, true);
+                setCheckboxDisabled(f4, true);
+                setCheckboxDisabled(rapbo, true);
+            } else if (rapbo.checked) {
+                // Group C selected — disable all others
+                setCheckboxDisabled(val, true);
+                setCheckboxDisabled(f4, true);
+                setCheckboxDisabled(excel, true);
+            } else if (val.checked || f4.checked) {
+                // Group A selected — disable scenarios
+                setCheckboxDisabled(excel, true);
+                setCheckboxDisabled(rapbo, true);
+            } else {
+                // Nothing selected — enable all
+                setCheckboxDisabled(val, false);
+                setCheckboxDisabled(f4, false);
+                setCheckboxDisabled(excel, false);
+                setCheckboxDisabled(rapbo, false);
+            }
+        }
+
+        function setCheckboxDisabled(cb, disabled) {
+            cb.disabled = disabled;
+            var item = cb.closest('.checkbox-item');
+            if (disabled) {
+                cb.checked = false;
+                item.classList.add('disabled');
+            } else {
+                item.classList.remove('disabled');
+            }
+        }
+
+        // Attach listeners on load
+        document.addEventListener('DOMContentLoaded', function() {
+            ['optValidations', 'optF4Help', 'optExcelUpload', 'optRapBO'].forEach(function(id) {
+                document.getElementById(id).addEventListener('change', updateCheckboxStates);
+            });
+        });
 
         function showError(message) {
             const errorEl = document.getElementById('errorMessage');
@@ -618,11 +663,13 @@ status - CHAR2"></textarea>
 
         function updateTabButtons() {
             const tabs = document.querySelectorAll('.output-tab');
-            const tabKeys = ['cds', 'bd', 'handler'];
+            const tabKeys = ['cds', 'bd', 'handler', 'upload', 'saver'];
+            const tabLabels = { cds: 'CDS View', bd: 'Behavior Definition', handler: 'Handler Class', upload: 'Upload Handler', saver: 'Saver Class' };
             tabs.forEach((tab, i) => {
                 const key = tabKeys[i];
+                if (!key) return;
                 const status = tabStatus[key];
-                const label = key === 'cds' ? 'CDS View' : key === 'bd' ? 'Behavior Definition' : 'Handler Class';
+                const label = tabLabels[key];
                 tab.classList.remove('tab-ready');
                 if (status === 'processing') {
                     tab.innerHTML = label + ' <span class="tab-spinner"></span>';
@@ -638,7 +685,7 @@ status - CHAR2"></textarea>
         function showTab(tab) {
             currentTab = tab;
             document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.output-tab:nth-child(${tab === 'cds' ? 1 : tab === 'bd' ? 2 : 3})`).classList.add('active');
+            document.querySelector(`.output-tab:nth-child(${tab === 'cds' ? 1 : tab === 'bd' ? 2 : tab === 'handler' ? 3 : tab === 'upload' ? 4 : 5})`).classList.add('active');
             updateTabButtons();
 
             const status = tabStatus[tab];
@@ -684,30 +731,56 @@ status - CHAR2"></textarea>
 
             // Gather options
             const options = {
-                create: document.getElementById('optCreate').checked,
-                update: document.getElementById('optUpdate').checked,
-                delete: document.getElementById('optDelete').checked,
-                draft: document.getElementById('optDraft').checked,
-                actions: document.getElementById('optActions').checked,
                 validations: document.getElementById('optValidations').checked,
-                determinations: document.getElementById('optDeterminations').checked,
-                featureControl: document.getElementById('optFeatureControl').checked,
-                authorization: document.getElementById('optAuthorization').checked
+                f4Help: document.getElementById('optF4Help').checked,
+                excelUpload: document.getElementById('optExcelUpload').checked,
+                rapBO: document.getElementById('optRapBO').checked
             };
 
             const additionalReq = document.getElementById('additionalReq').value.trim();
+
+            // Validate BAPI name is provided when Excel or RAP BO is selected
+            if ((options.excelUpload || options.rapBO) && !additionalReq.toLowerCase().includes('bapi')) {
+                showError('Please specify the BAPI/FM name in Additional Requirements.');
+                return;
+            }
 
             // Build prompt
             const prompt = buildPrompt(entityName, tableName, fieldsInput, options, additionalReq);
 
             // Reset state
-            generatedCode = { cds: '', bd: '', handler: '' };
-            tabStatus = { cds: 'processing', bd: 'processing', handler: 'processing' };
+            generatedCode = { cds: '', bd: '', handler: '', upload: '', saver: '' };
+            var f4Only = options.f4Help && !options.validations && !options.excelUpload && !options.rapBO;
+            var valOnly = options.validations && !options.f4Help && !options.excelUpload && !options.rapBO;
+            if (f4Only) {
+                tabStatus = { cds: 'processing', bd: 'idle', handler: 'idle', upload: 'idle', saver: 'idle' };
+                document.getElementById('tab-cds').style.display = '';
+                document.getElementById('tab-bd').style.display = 'none';
+                document.getElementById('tab-handler').style.display = 'none';
+                document.getElementById('tab-upload').style.display = 'none';
+                document.getElementById('tab-saver').style.display = 'none';
+                showTab('cds');
+            } else if (valOnly) {
+                tabStatus = { cds: 'idle', bd: 'processing', handler: 'processing', upload: 'idle', saver: 'idle' };
+                document.getElementById('tab-cds').style.display = 'none';
+                document.getElementById('tab-bd').style.display = '';
+                document.getElementById('tab-handler').style.display = '';
+                document.getElementById('tab-upload').style.display = 'none';
+                document.getElementById('tab-saver').style.display = 'none';
+                showTab('bd');
+            } else {
+                tabStatus = { cds: 'processing', bd: 'processing', handler: 'processing', upload: options.excelUpload ? 'processing' : 'idle', saver: options.rapBO ? 'processing' : 'idle' };
+                document.getElementById('tab-cds').style.display = '';
+                document.getElementById('tab-bd').style.display = '';
+                document.getElementById('tab-handler').style.display = '';
+                document.getElementById('tab-upload').style.display = options.excelUpload ? '' : 'none';
+                document.getElementById('tab-saver').style.display = options.rapBO ? '' : 'none';
+            }
 
             // Show output area immediately with processing state
             document.getElementById('loading').classList.remove('active');
             document.getElementById('outputContainer').style.display = 'block';
-            showTab('cds');
+            if (!valOnly) showTab('cds');
 
             try {
                 const response = await fetch(WORKER_URL, {
@@ -743,9 +816,8 @@ status - CHAR2"></textarea>
 
                     sseBuffer += decoder.decode(value, { stream: true });
 
-                    // Parse SSE events from buffer
                     const lines = sseBuffer.split('\n');
-                    sseBuffer = lines.pop(); // keep incomplete line in buffer
+                    sseBuffer = lines.pop();
 
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
@@ -764,21 +836,20 @@ status - CHAR2"></textarea>
                     }
                 }
 
-                // Stream ended - finalize any sections that didn't get END markers
                 finalizeStream(fullText);
 
             } catch (error) {
-                // If error happens mid-stream, finalize what we have
                 tabStatus.cds = tabStatus.cds === 'processing' ? 'idle' : tabStatus.cds;
                 tabStatus.bd = tabStatus.bd === 'processing' ? 'idle' : tabStatus.bd;
                 tabStatus.handler = tabStatus.handler === 'processing' ? 'idle' : tabStatus.handler;
+                tabStatus.upload = tabStatus.upload === 'processing' ? 'idle' : tabStatus.upload;
+                tabStatus.saver = tabStatus.saver === 'processing' ? 'idle' : tabStatus.saver;
                 updateTabButtons();
                 showError('Error: ' + error.message);
             }
         }
 
         function processStreamedText(fullText) {
-            // Check each section progressively
             const cdsStart = fullText.indexOf('===CDS_START===');
             const cdsEnd = fullText.indexOf('===CDS_END===');
             const bdStart = fullText.indexOf('===BD_START===');
@@ -786,21 +857,18 @@ status - CHAR2"></textarea>
             const handlerStart = fullText.indexOf('===HANDLER_START===');
             const handlerEnd = fullText.indexOf('===HANDLER_END===');
 
-            // CDS section
             if (cdsStart !== -1 && cdsEnd !== -1 && tabStatus.cds !== 'ready') {
                 generatedCode.cds = fullText.substring(cdsStart + 15, cdsEnd).trim();
                 tabStatus.cds = 'ready';
                 if (currentTab === 'cds') showTab('cds');
                 updateTabButtons();
             } else if (cdsStart !== -1 && cdsEnd === -1) {
-                // CDS is being streamed right now - show live
                 generatedCode.cds = fullText.substring(cdsStart + 15).trim();
                 if (currentTab === 'cds') {
                     document.getElementById('codeOutput').textContent = generatedCode.cds;
                 }
             }
 
-            // BD section
             if (bdStart !== -1 && bdEnd !== -1 && tabStatus.bd !== 'ready') {
                 generatedCode.bd = fullText.substring(bdStart + 14, bdEnd).trim();
                 tabStatus.bd = 'ready';
@@ -813,7 +881,6 @@ status - CHAR2"></textarea>
                 }
             }
 
-            // Handler section
             if (handlerStart !== -1 && handlerEnd !== -1 && tabStatus.handler !== 'ready') {
                 generatedCode.handler = fullText.substring(handlerStart + 19, handlerEnd).trim();
                 tabStatus.handler = 'ready';
@@ -825,10 +892,41 @@ status - CHAR2"></textarea>
                     document.getElementById('codeOutput').textContent = generatedCode.handler;
                 }
             }
+
+            // Upload Handler section
+            const uploadStart = fullText.indexOf('===UPLOAD_START===');
+            const uploadEnd = fullText.indexOf('===UPLOAD_END===');
+
+            if (uploadStart !== -1 && uploadEnd !== -1 && tabStatus.upload !== 'ready') {
+                generatedCode.upload = fullText.substring(uploadStart + 18, uploadEnd).trim();
+                tabStatus.upload = 'ready';
+                if (currentTab === 'upload') showTab('upload');
+                updateTabButtons();
+            } else if (uploadStart !== -1 && uploadEnd === -1) {
+                generatedCode.upload = fullText.substring(uploadStart + 18).trim();
+                if (currentTab === 'upload') {
+                    document.getElementById('codeOutput').textContent = generatedCode.upload;
+                }
+            }
+
+            // Saver Class section
+            const saverStart = fullText.indexOf('===SAVER_START===');
+            const saverEnd = fullText.indexOf('===SAVER_END===');
+
+            if (saverStart !== -1 && saverEnd !== -1 && tabStatus.saver !== 'ready') {
+                generatedCode.saver = fullText.substring(saverStart + 17, saverEnd).trim();
+                tabStatus.saver = 'ready';
+                if (currentTab === 'saver') showTab('saver');
+                updateTabButtons();
+            } else if (saverStart !== -1 && saverEnd === -1) {
+                generatedCode.saver = fullText.substring(saverStart + 17).trim();
+                if (currentTab === 'saver') {
+                    document.getElementById('codeOutput').textContent = generatedCode.saver;
+                }
+            }
         }
 
         function finalizeStream(fullText) {
-            // For any section still "processing", check if partial content exists
             if (tabStatus.cds === 'processing') {
                 const cdsStart = fullText.indexOf('===CDS_START===');
                 if (cdsStart !== -1) {
@@ -842,7 +940,6 @@ status - CHAR2"></textarea>
             if (tabStatus.bd === 'processing') {
                 const bdStart = fullText.indexOf('===BD_START===');
                 if (bdStart !== -1) {
-                    // Remove any trailing markers from other sections
                     let content = fullText.substring(bdStart + 14);
                     const nextMarker = content.indexOf('===HANDLER_START===');
                     if (nextMarker !== -1) content = content.substring(0, nextMarker);
@@ -856,11 +953,35 @@ status - CHAR2"></textarea>
             if (tabStatus.handler === 'processing') {
                 const handlerStart = fullText.indexOf('===HANDLER_START===');
                 if (handlerStart !== -1) {
-                    generatedCode.handler = fullText.substring(handlerStart + 19).trim();
+                    let content = fullText.substring(handlerStart + 19);
+                    var nextM = content.indexOf('===UPLOAD_START===');
+                    if (nextM === -1) nextM = content.indexOf('===SAVER_START===');
+                    if (nextM !== -1) content = content.substring(0, nextM);
+                    generatedCode.handler = content.trim();
                     tabStatus.handler = 'exhausted';
                 } else {
                     generatedCode.handler = '';
                     tabStatus.handler = 'exhausted';
+                }
+            }
+            if (tabStatus.upload === 'processing') {
+                const uploadStart = fullText.indexOf('===UPLOAD_START===');
+                if (uploadStart !== -1) {
+                    generatedCode.upload = fullText.substring(uploadStart + 18).trim();
+                    tabStatus.upload = 'exhausted';
+                } else {
+                    generatedCode.upload = '';
+                    tabStatus.upload = 'exhausted';
+                }
+            }
+            if (tabStatus.saver === 'processing') {
+                const saverStart = fullText.indexOf('===SAVER_START===');
+                if (saverStart !== -1) {
+                    generatedCode.saver = fullText.substring(saverStart + 17).trim();
+                    tabStatus.saver = 'exhausted';
+                } else {
+                    generatedCode.saver = '';
+                    tabStatus.saver = 'exhausted';
                 }
             }
             updateTabButtons();
@@ -869,51 +990,97 @@ status - CHAR2"></textarea>
 
         function buildPrompt(entityName, tableName, fieldsInput, options, additionalReq) {
             let optionsList = [];
-            if (options.create) optionsList.push('create');
-            if (options.update) optionsList.push('update');
-            if (options.delete) optionsList.push('delete');
-            if (options.draft) optionsList.push('draft handling with draft table');
-            if (options.actions) optionsList.push('custom actions (generate sample actions based on the entity context)');
-            if (options.validations) optionsList.push('validations (generate meaningful validations based on fields)');
-            if (options.determinations) optionsList.push('determinations (generate useful determinations like setting timestamps, user info)');
-            if (options.featureControl) optionsList.push('instance feature control');
-            if (options.authorization) optionsList.push('authorization master');
+            if (options.validations) optionsList.push('validations (generate meaningful validations for all fields using standard CDS views where applicable)');
+            if (options.f4Help) optionsList.push('F4 value help (use standard CDS views like I_CompanyCodeStdVH, I_PlantStdVH, I_CostCenterStdVH etc. for all applicable fields, add @Consumption.valueHelpDefinition annotations in the CDS view)');
+            if (options.excelUpload) optionsList.push('Excel upload functionality (generate upload handler class for reading Excel, parsing rows, validating, and posting via BAPI)');
+            if (options.rapBO) optionsList.push('RAP Business Object with BAPI (generate complete unmanaged RAP BO with behavior implementation calling BAPI specified in additional requirements, map BAPI import/export parameters to BO fields, handle RETURN table error mapping)');
 
-            return `You are an expert SAP RAP ABAP developer with 20+ years of experience and specializing in RAP (RESTful ABAP Programming) development for CBC kind of apps.
-                    Also make sure to use standard CDS views for doing validations(if selected by user) and same for F4 helps.
-                    Generate complete, production-ready code with best practices of SAP ABAP for the following RAP Business Object:
+            var f4Only = options.f4Help && !options.validations && !options.excelUpload && !options.rapBO;
+            var valOnly = options.validations && !options.f4Help && !options.excelUpload && !options.rapBO;
 
-**Entity Name:** ${entityName}
-**Database Table:** ${tableName}
-**Fields:**
-${fieldsInput}
+            var codeBlocksSection = '';
+            var markersSection = '';
 
-**Required Features:**
-${optionsList.join(', ')}
-
-**Additional Requirements:**
-${additionalReq || 'None specified'}
-
-Please generate the following three separate code blocks:
+            if (f4Only) {
+                codeBlocksSection = `Please generate ONLY the CDS View (no Behavior Definition or Handler Class needed):
 
 1. **CDS View** - Complete CDS view definition with:
    - Proper annotations (@AbapCatalog, @AccessControl, @EndUserText, @ObjectModel)
    - All fields with proper associations if applicable
    - UI annotations for Fiori Elements
+   - @Consumption.valueHelpDefinition annotations using standard CDS views (I_CompanyCodeStdVH, I_PlantStdVH, I_CostCenterStdVH, etc.) for all applicable fields`;
+
+                markersSection = `Format your response EXACTLY as follows (use these exact markers):
+
+===CDS_START===
+(CDS view code here)
+===CDS_END===`;
+            } else if (valOnly) {
+                codeBlocksSection = `Please generate ONLY the Behavior Definition and Handler Class (no CDS View needed):
+
+1. **Behavior Definition** - Complete BDEF with:
+   - Managed scenario
+   - Validation methods for all applicable fields using standard CDS views
+   - Field mappings
+
+2. **Handler Class** - Complete ABAP class implementing:
+   - All validation methods
+   - Proper method signatures using standard CDS views for checks
+   - Sample implementation logic for each validation
+   - Comments explaining the logic`;
+
+                markersSection = `Format your response EXACTLY as follows (use these exact markers):
+
+===BD_START===
+(Behavior definition code here)
+===BD_END===
+
+===HANDLER_START===
+(Handler class code here)
+===HANDLER_END===`;
+            } else {
+                var blockCount = 3 + (options.excelUpload ? 1 : 0) + (options.rapBO ? 1 : 0);
+                var blockNum = 3;
+                codeBlocksSection = `Please generate the following ${blockCount === 3 ? 'three' : blockCount === 4 ? 'four' : 'five'} separate code blocks:
+
+1. **CDS View** - Complete CDS view definition with:
+   - Proper annotations (@AbapCatalog, @AccessControl, @EndUserText, @ObjectModel)
+   - All fields with proper associations if applicable
+   ${options.rapBO ? '- No UI annotations needed (this is a Web API, not a Fiori app)' : '- UI annotations for Fiori Elements'}
+   ${options.f4Help ? '- @Consumption.valueHelpDefinition annotations using standard CDS views (I_CompanyCodeStdVH, I_PlantStdVH, I_CostCenterStdVH, etc.) for all applicable fields' : ''}
+   ${options.excelUpload ? '- Include file upload fields: attachment (type xstring), filename (type string), mimetype (type string) with @UI.hidden: false so they are visible in Fiori UI for file upload' : ''}
 
 2. **Behavior Definition** - Complete BDEF with:
-   - All requested operations and features
-   - Proper syntax for managed/unmanaged scenario
+   ${options.rapBO ? '- Unmanaged implementation with separate saver class' : '- All requested operations and features'}
+   - Proper syntax for ${options.rapBO ? 'unmanaged' : 'managed'} scenario
    - Field mappings
-   - All actions, validations, determinations as requested
+   ${options.rapBO ? '- No draft handling (Web API consumed by CPI)' : ''}
+   ${options.validations ? '- Validation methods for all applicable fields' : ''}
+   ${options.excelUpload ? '- A static factory action for triggering Excel upload processing' : ''}
 
 3. **Handler Class** - Complete ABAP class implementing:
-   - All methods for the behavior definition
+   ${options.rapBO ? '- Interaction phase methods only: CREATE, READ, UPDATE, DELETE' : '- All methods for the behavior definition'}
    - Proper method signatures
    - Sample implementation logic for each method
    - Comments explaining the logic
+   ${options.rapBO ? '- No BAPI call here (BAPI is called in the saver class during save phase)' : ''}
+${options.excelUpload ? `
+${++blockNum}. **Upload Handler Class** - Separate ABAP class for Excel processing:
+   - Method to parse uploaded Excel file using CL_FDT_XL_SPREADSHEET
+   - Row-by-row validation logic
+   - BAPI call for each valid row with parameter mapping
+   - Error collection and status tracking per row
+   - RETURN table error mapping to RAP messages` : ''}
+${options.rapBO ? `
+${options.excelUpload ? ++blockNum : ++blockNum}. **Saver Class** - Separate ABAP class for save phase (lhc_saver):
+   - Implements SAVE_MODIFIED method
+   - Calls BAPI specified in additional requirements with proper parameter mapping
+   - Maps BO fields to BAPI import parameters
+   - Handles BAPI RETURN table errors and maps them to RAP failed/reported
+   - Handles COMMIT WORK / ROLLBACK as needed
+   - Comments explaining the save sequence` : ''}`;
 
-Format your response EXACTLY as follows (use these exact markers):
+                markersSection = `Format your response EXACTLY as follows (use these exact markers):
 
 ===CDS_START===
 (CDS view code here)
@@ -926,6 +1093,34 @@ Format your response EXACTLY as follows (use these exact markers):
 ===HANDLER_START===
 (Handler class code here)
 ===HANDLER_END===
+${options.excelUpload ? `
+===UPLOAD_START===
+(Upload handler class code here)
+===UPLOAD_END===` : ''}
+${options.rapBO ? `
+===SAVER_START===
+(Saver class code here)
+===SAVER_END===` : ''}`;
+            }
+
+            return `You are an expert SAP RAP ABAP developer with 20+ years of experience and specializing in RAP (RESTful ABAP Programming) development for CBC kind of apps.
+                    Also make sure to use standard CDS views for doing validations(if selected by user) and same for F4 helps.
+                    Generate complete, production-ready code with best practices of SAP ABAP for the following RAP Business Object:
+
+**Entity Name:** ${entityName}
+**Database Table:** ${tableName}
+**Fields:**
+${fieldsInput}
+
+**Required Features:**
+${optionsList.length > 0 ? optionsList.join('\n') : 'Basic managed RAP BO with create, update, delete'}
+
+**Additional Requirements:**
+${additionalReq || 'None specified'}
+
+${codeBlocksSection}
+
+${markersSection}
 
 Important:
 - Generate syntactically correct ABAP/CDS code
@@ -934,19 +1129,6 @@ Important:
 - Make the code production-ready`;
         }
 
-        function parseResponse(responseText) {
-            // Extract CDS
-            const cdsMatch = responseText.match(/===CDS_START===([\s\S]*?)===CDS_END===/);
-            generatedCode.cds = cdsMatch ? cdsMatch[1].trim() : '// CDS view not generated';
-
-            // Extract BD
-            const bdMatch = responseText.match(/===BD_START===([\s\S]*?)===BD_END===/);
-            generatedCode.bd = bdMatch ? bdMatch[1].trim() : '// Behavior definition not generated';
-
-            // Extract Handler
-            const handlerMatch = responseText.match(/===HANDLER_START===([\s\S]*?)===HANDLER_END===/);
-            generatedCode.handler = handlerMatch ? handlerMatch[1].trim() : '// Handler class not generated';
-        }
         // ==================== GUIDED TOUR ====================
         let tourActive = false;
         let tourStep = 0;
@@ -978,16 +1160,16 @@ Important:
             },
             {
                 target: '.checkbox-group',
-                title: 'Step 4: Authorization & Validations',
-                desc: 'Enable Authorization and Validations together. These are essential for any production-ready RAP app.',
+                title: 'Step 4: Generation Options',
+                desc: 'Validations — auto-generates checks using standard CDS views. F4 Help — adds value help annotations. Excel Upload & Post with BAPI — bulk upload, validate, post via BAPI. RAP BO with BAPI — unmanaged RAP BO calling a BAPI.',
                 type: 'multicheck',
-                checks: ['#optAuthorization', '#optValidations']
+                checks: ['#optValidations', '#optF4Help']
             },
             {
                 target: '#additionalReq',
                 title: 'Step 5: Additional Requirements',
-                desc: 'Describe custom logic here. The AI reads this and generates matching code in the handler class.',
-                value: 'Add authorization check on KOSTL (Cost Center) field — validate user has proper access before allowing create/update.',
+                desc: 'Specify BAPI names here (e.g., Posting BAPI: BAPI_FIXEDASSET_CHANGE). Also describe any custom logic the AI should generate.',
+                value: 'Posting BAPI: BAPI_FIXEDASSET_CHANGE. Check BAPI: BAPI_FIXEDASSET_CHANGE_CHECK. Add authorization check on Cost Center field.',
                 type: 'type'
             },
             {
@@ -1026,7 +1208,6 @@ Important:
         function startTour() {
             tourStep = 0;
             tourActive = true;
-            // Clear all fields first
             clearAllFields();
             createTourElements();
             tourBackdrop.classList.add('active');
@@ -1046,21 +1227,17 @@ Important:
             document.getElementById('tableName').value = '';
             document.getElementById('fieldsInput').value = '';
             document.getElementById('additionalReq').value = '';
-            // Uncheck non-default checkboxes
-            document.getElementById('optActions').checked = false;
             document.getElementById('optValidations').checked = false;
-            document.getElementById('optDeterminations').checked = false;
-            document.getElementById('optFeatureControl').checked = false;
-            document.getElementById('optAuthorization').checked = false;
-            document.getElementById('optDraft').checked = false;
-            // Reset defaults
-            document.getElementById('optCreate').checked = true;
-            document.getElementById('optUpdate').checked = true;
-            document.getElementById('optDelete').checked = true;
+            document.getElementById('optF4Help').checked = false;
+            document.getElementById('optExcelUpload').checked = false;
+            document.getElementById('optRapBO').checked = false;
+            updateCheckboxStates();
             // Reset output
-            generatedCode = { cds: '', bd: '', handler: '' };
-            tabStatus = { cds: 'idle', bd: 'idle', handler: 'idle' };
+            generatedCode = { cds: '', bd: '', handler: '', upload: '', saver: '' };
+            tabStatus = { cds: 'idle', bd: 'idle', handler: 'idle', upload: 'idle', saver: 'idle' };
             updateTabButtons();
+            document.getElementById('tab-upload').style.display = 'none';
+            document.getElementById('tab-saver').style.display = 'none';
             document.getElementById('codeOutput').textContent = '// Generated code will appear here...';
         }
 
@@ -1069,7 +1246,6 @@ Important:
             el.focus();
             for (let i = 0; i < text.length; i++) {
                 el.value += text[i];
-                // Trigger input event for textareas to auto-resize if needed
                 el.dispatchEvent(new Event('input'));
                 await new Promise(r => setTimeout(r, 30 + Math.random() * 30));
             }
@@ -1098,10 +1274,12 @@ define root view entity ZENTITY_NAME
 
       @UI: { lineItem: [{ position: 10 }],
              identification: [{ position: 10 }] }
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_CompanyCodeStdVH', element: 'CompanyCode' } }]
   key bukrs    as Bukrs,
 
       @UI: { lineItem: [{ position: 20 }],
              identification: [{ position: 20 }] }
+      @Consumption.valueHelpDefinition: [{ entity: { name: 'I_PlantStdVH', element: 'Plant' } }]
       werks    as Werks,
 
       @UI: { lineItem: [{ position: 30 }],
@@ -1173,10 +1351,8 @@ ENDCLASS.`;
             const target = document.querySelector(step.target);
             if (!target) { tourStep++; showTourStep(); return; }
 
-            // Remove previous highlight
             if (prevHighlighted) prevHighlighted.classList.remove('tour-highlight');
 
-            // Determine highlight element
             let highlightEl = target;
             if (step.type === 'check') {
                 highlightEl = target.closest('.checkbox-item') || target;
@@ -1186,11 +1362,9 @@ ENDCLASS.`;
             highlightEl.classList.add('tour-highlight');
             prevHighlighted = highlightEl;
 
-            // Scroll into view
             highlightEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             await new Promise(r => setTimeout(r, 400));
 
-            // Perform the action based on type
             if (step.type === 'type' && step.value) {
                 await typeValue(target, step.value);
             } else if (step.type === 'check') {
@@ -1202,7 +1376,6 @@ ENDCLASS.`;
                     if (cb) {
                         await new Promise(r => setTimeout(r, 400));
                         cb.checked = true;
-                        // Flash the parent item
                         const item = cb.closest('.checkbox-item');
                         if (item) {
                             item.style.background = '#1a4a7a';
@@ -1211,7 +1384,6 @@ ENDCLASS.`;
                     }
                 }
             } else if (step.type === 'generate') {
-                // Simulate code generation
                 await new Promise(r => setTimeout(r, 300));
                 generatedCode.cds = sampleCDS;
                 generatedCode.bd = sampleBD;
@@ -1220,11 +1392,9 @@ ENDCLASS.`;
                 document.getElementById('outputContainer').style.display = 'block';
                 showTab('cds');
             } else if (step.type === 'showcase') {
-                // Just highlight the output - code is already there
                 await new Promise(r => setTimeout(r, 200));
             }
 
-            // Position tooltip
             const pct = ((tourStep + 1) / tourSteps.length) * 100;
             const isLast = tourStep === tourSteps.length - 1;
 
@@ -1239,7 +1409,6 @@ ENDCLASS.`;
                 </div>
             `;
 
-            // Position below or above the target
             const rect = highlightEl.getBoundingClientRect();
             const spaceBelow = window.innerHeight - rect.bottom;
 
@@ -1251,7 +1420,6 @@ ENDCLASS.`;
                 tourTooltip.style.top = (rect.top + window.scrollY - tourTooltip.offsetHeight - 15) + 'px';
             }
 
-            // Center horizontally relative to target, but keep within viewport
             let left = rect.left + (rect.width / 2) - 160;
             left = Math.max(10, Math.min(left, window.innerWidth - 340));
             tourTooltip.style.left = left + 'px';
