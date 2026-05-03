@@ -485,6 +485,111 @@
         }
         .tour-btn-next:hover { transform: scale(1.05); }
 
+        /* Suggestion Modal */
+        .suggest-link {
+            color: #00d4ff;
+            text-decoration: none;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+        .suggest-link:hover { text-decoration: underline; }
+
+        .suggest-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 10001;
+            align-items: center;
+            justify-content: center;
+        }
+        .suggest-backdrop.active { display: flex; }
+
+        .suggest-modal {
+            background: #0f3460;
+            border: 2px solid #00d4ff;
+            border-radius: 12px;
+            padding: 25px;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .suggest-modal h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .suggest-modal label {
+            display: block;
+            color: #fff;
+            font-size: 13px;
+            margin-bottom: 6px;
+            margin-top: 12px;
+        }
+        .suggest-modal input[type="email"],
+        .suggest-modal textarea {
+            width: 100%;
+            padding: 10px;
+            background: #16213e;
+            border: 1px solid #1a4a7a;
+            border-radius: 6px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        .suggest-modal textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .suggest-modal input:focus,
+        .suggest-modal textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .suggest-char-count {
+            font-size: 11px;
+            color: #888;
+            text-align: right;
+            margin-top: 4px;
+        }
+        .suggest-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 18px;
+        }
+        .suggest-btn-cancel {
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid #555;
+            color: #888;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .suggest-btn-submit {
+            padding: 8px 18px;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            border: none;
+            color: #1a1a2e;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .suggest-btn-submit:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .suggest-honeypot {
+            position: absolute;
+            left: -9999px;
+        }
+        .suggest-success {
+            text-align: center;
+            color: #00cc66;
+            padding: 20px 0;
+            font-size: 15px;
+        }
+
     </style>
 </head>
 <body>
@@ -581,7 +686,29 @@ status"></textarea>
         </div>
 
         <div class="footer">
-           <p style="color: white;">Made with <span style="color: red;">&#10084;</span> | Powered by Claude AI | Built for ABAP Developers</p>
+           <p style="color: white;">Made with <span style="color: red;">&#10084;</span> | Powered by Claude AI | Built for ABAP Developers | <a class="suggest-link" onclick="openSuggestModal()">💡 Suggest an idea</a></p>
+        </div>
+    </div>
+
+    <!-- Suggestion Modal -->
+    <div class="suggest-backdrop" id="suggestBackdrop">
+        <div class="suggest-modal">
+            <div id="suggestForm">
+                <h3>💡 Share Your Suggestion</h3>
+                <label>Your Email (optional)</label>
+                <input type="email" id="suggestEmail" placeholder="you@example.com">
+                <label>Your Suggestion <span style="color:#ff4444">*</span></label>
+                <textarea id="suggestMessage" maxlength="500" placeholder="Tell us what you'd like to see..."></textarea>
+                <div class="suggest-char-count"><span id="suggestCharCount">0</span> / 500</div>
+                <input type="text" class="suggest-honeypot" id="suggestHoneypot" tabindex="-1" autocomplete="off">
+                <div class="suggest-buttons">
+                    <button class="suggest-btn-cancel" onclick="closeSuggestModal()">Cancel</button>
+                    <button class="suggest-btn-submit" id="suggestSubmitBtn" onclick="submitSuggestion()">Send</button>
+                </div>
+            </div>
+            <div id="suggestSuccess" style="display:none">
+                <div class="suggest-success">✅ Thanks! Your suggestion has been sent.</div>
+            </div>
         </div>
     </div>
 
@@ -1431,6 +1558,85 @@ ENDCLASS.`;
                 endTour();
             } else {
                 showTourStep();
+            }
+        }
+
+        // ==================== SUGGESTION MODAL ====================
+        const SUGGEST_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdXURv8gZXPYomCgIz0PQy5lleJiwW_lt9aaFaz_BFUSEhTBg/formResponse';
+        const SUGGEST_EMAIL_FIELD = 'entry.2095626072';
+        const SUGGEST_MESSAGE_FIELD = 'entry.1553346226';
+
+        function openSuggestModal() {
+            document.getElementById('suggestBackdrop').classList.add('active');
+            document.getElementById('suggestForm').style.display = '';
+            document.getElementById('suggestSuccess').style.display = 'none';
+            document.getElementById('suggestEmail').value = '';
+            document.getElementById('suggestMessage').value = '';
+            document.getElementById('suggestHoneypot').value = '';
+            document.getElementById('suggestCharCount').textContent = '0';
+            document.getElementById('suggestSubmitBtn').disabled = false;
+            document.getElementById('suggestSubmitBtn').textContent = 'Send';
+        }
+
+        function closeSuggestModal() {
+            document.getElementById('suggestBackdrop').classList.remove('active');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var msgEl = document.getElementById('suggestMessage');
+            if (msgEl) {
+                msgEl.addEventListener('input', function() {
+                    document.getElementById('suggestCharCount').textContent = msgEl.value.length;
+                });
+            }
+            var backdrop = document.getElementById('suggestBackdrop');
+            if (backdrop) {
+                backdrop.addEventListener('click', function(e) {
+                    if (e.target === backdrop) closeSuggestModal();
+                });
+            }
+        });
+
+        async function submitSuggestion() {
+            var email = document.getElementById('suggestEmail').value.trim();
+            var message = document.getElementById('suggestMessage').value.trim();
+            var honeypot = document.getElementById('suggestHoneypot').value;
+
+            // Spam check — bots fill hidden fields
+            if (honeypot) {
+                document.getElementById('suggestForm').style.display = 'none';
+                document.getElementById('suggestSuccess').style.display = '';
+                return;
+            }
+
+            if (!message) {
+                alert('Please enter a suggestion before sending.');
+                return;
+            }
+
+            var btn = document.getElementById('suggestSubmitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+
+            try {
+                var formData = new FormData();
+                formData.append(SUGGEST_EMAIL_FIELD, email);
+                formData.append(SUGGEST_MESSAGE_FIELD, message);
+
+                await fetch(SUGGEST_FORM_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: formData
+                });
+
+                // no-cors means we can't read response — assume success
+                document.getElementById('suggestForm').style.display = 'none';
+                document.getElementById('suggestSuccess').style.display = '';
+                setTimeout(closeSuggestModal, 2000);
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'Send';
+                alert('Could not send. Please try again later.');
             }
         }
     </script>
